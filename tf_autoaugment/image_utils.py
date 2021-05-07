@@ -1,3 +1,4 @@
+"""Utils for image operations."""
 import tensorflow as tf
 
 
@@ -57,7 +58,7 @@ def unwrap_batch(image, replace):
     return image
 
 
-def blend_batch(image1: tf.Tensor, image2: tf.Tensor, factor: float) -> tf.Tensor:
+def blend_batch(image1: tf.Tensor, image2: tf.Tensor, factor: tf.Tensor) -> tf.Tensor:
     """Blend image1 and image2 using 'factor'.
 
     Factor can be above 0.0.  A value of 0.0 means only image1 is used.

@@ -1,48 +1,46 @@
-"""Unit tests for modified versions of image ops.
+"""Unit tests for batched, modified versions of transforms.
 
 We want to check if our modified, batched version work the same way as non-batched
 executed in a for loop.
 """
-
 import tensorflow as tf
 import tensorflow_addons as tfa
 from absl.testing import absltest, parameterized
 
-from tf_autoaugment.image_ops import (
-    _autocontrast,
-    _equalize,
-    autocontrast,
-    equalize,
-    shear_x,
-    shear_y,
-    translate_x,
-    translate_y,
-)
+from tf_autoaugment.transforms.autocontrast import AutoContrast
+from tf_autoaugment.transforms.contrast import Contrast
+from tf_autoaugment.transforms.equalize import Equalize
+from tf_autoaugment.transforms.shear_x import ShearX
+from tf_autoaugment.transforms.shear_y import ShearY
+from tf_autoaugment.transforms.translate_x import TranslateX
+from tf_autoaugment.transforms.translate_y import TranslateY
 
 INPUT_DTYPES = [tf.float32, tf.int32, tf.uint8]
 NAMED_TEST_PARAMS = [
     {"testcase_name": dtype.name, "dtype": dtype} for dtype in INPUT_DTYPES
 ]
 
-RNG = tf.random.Generator.from_non_deterministic_state()
-MOCK_INPUT = RNG.uniform(shape=(5, 224, 224, 3), minval=0, maxval=255, dtype=tf.int32)
-
 
 class TestBatchedAutocontrast(parameterized.TestCase):
-    # Autocontrast expects uint8
-    autocontrast_input = tf.cast(MOCK_INPUT, tf.uint8)
+    rng = tf.random.Generator.from_non_deterministic_state()
+    mock_input = rng.uniform(
+        shape=(5, 224, 224, 3), minval=0, maxval=255, dtype=tf.int32
+    )
+    inputs = tf.cast(mock_input, tf.uint8)  # autocontrast expects uint8
+
+    transform = AutoContrast()
 
     @parameterized.named_parameters(NAMED_TEST_PARAMS)
     def test_batched_autocontrast_working_the_same_way_as_non_batched_in_for_loop(
         self, dtype: tf.dtypes.DType
     ):
         non_batched_output = tf.stack(
-            [_autocontrast(x) for x in self.autocontrast_input]
+            [self.transform._autocontrast(x) for x in self.inputs]
         )
 
         # Batched is dtype agnostic:
-        batched_input = tf.cast(MOCK_INPUT, dtype)
-        batched_output = autocontrast(images=batched_input)
+        batched_input = tf.cast(self.mock_input, dtype)
+        batched_output = self.transform.autocontrast(images=batched_input)
 
         tf.debugging.assert_equal(
             tf.cast(batched_output, tf.uint8),  # non-batched autocontrast returns uint8
@@ -50,15 +48,51 @@ class TestBatchedAutocontrast(parameterized.TestCase):
         )
 
 
+class TestBatchedContrast(parameterized.TestCase):
+    rng = tf.random.Generator.from_non_deterministic_state()
+    mock_input = rng.uniform(
+        shape=(5, 224, 224, 3), minval=0, maxval=255, dtype=tf.int32
+    )
+    inputs = tf.cast(mock_input, tf.uint8)  # contrast expects uint8
+
+    factor = rng.uniform(shape=(), minval=0, maxval=1.0, dtype=tf.float32)
+
+    transform = Contrast()
+
+    @parameterized.named_parameters(NAMED_TEST_PARAMS)
+    def test_batched_contrast_working_the_same_way_as_non_batched_in_for_loop(
+        self, dtype: tf.dtypes.DType
+    ):
+        non_batched_output = tf.stack(
+            [self.transform._contrast(x, self.factor) for x in self.inputs]
+        )
+
+        # Batched is dtype agnostic:
+        batched_input = tf.cast(self.inputs, dtype)
+        batched_output = self.transform.contrast(batched_input, self.factor)
+
+        tf.debugging.assert_equal(
+            tf.cast(batched_output, tf.uint8),  # non-batched contrast return uint8
+            non_batched_output,
+        )
+
+
 class TestBatchedEqualize(parameterized.TestCase):
+    rng = tf.random.Generator.from_non_deterministic_state()
+    mock_input = rng.uniform(
+        shape=(5, 224, 224, 3), minval=0, maxval=255, dtype=tf.int32
+    )
+
+    transform = Equalize()
+
     @parameterized.named_parameters(NAMED_TEST_PARAMS)
     def test_batched_equalize_working_the_same_way_as_the_non_batched_in_for_loop(
         self, dtype: tf.dtypes.DType
     ):
-        inputs = tf.cast(MOCK_INPUT, dtype)
-        non_batched_output = tf.stack([_equalize(x) for x in inputs])
+        inputs = tf.cast(self.mock_input, dtype)
+        non_batched_output = tf.stack([self.transform._equalize(x) for x in inputs])
 
-        batched_output = equalize(inputs)
+        batched_output = self.transform.equalize(inputs)
 
         tf.debugging.assert_equal(
             tf.cast(batched_output, tf.uint8),  # non-batched equalize returns uint8
@@ -67,54 +101,79 @@ class TestBatchedEqualize(parameterized.TestCase):
 
 
 class TestBatchedShearX(parameterized.TestCase):
-    level = tf.constant(5)
+    rng = tf.random.Generator.from_non_deterministic_state()
+    mock_input = rng.uniform(
+        shape=(5, 224, 224, 3), minval=0, maxval=255, dtype=tf.int32
+    )
+
+    level = rng.uniform(shape=(), minval=1, maxval=7, dtype=tf.int32)
     replace = tf.constant([128] * 3)
+
+    transform = ShearX()
 
     @parameterized.named_parameters(NAMED_TEST_PARAMS)
     def test_batched_shear_x_producing_same_outputs_as_non_batched_in_for_loop(
         self, dtype: tf.dtypes.DType
     ):
-        inputs = tf.cast(MOCK_INPUT, dtype)
+        inputs = tf.cast(self.mock_input, dtype)
         non_batched_output = tf.stack(
             [
                 tfa.image.shear_x(x, level=self.level, replace=self.replace)
                 for x in inputs
             ]
         )
-        batched_output = shear_x(inputs, level=self.level, replace=self.replace)
+        batched_output = self.transform.shear_x(
+            inputs, level=self.level, replace=self.replace
+        )
 
         tf.debugging.assert_equal(batched_output, non_batched_output)
 
 
 class TestBatchedShearY(parameterized.TestCase):
-    level = tf.constant(5)
+    rng = tf.random.Generator.from_non_deterministic_state()
+    mock_input = rng.uniform(
+        shape=(5, 224, 224, 3), minval=0, maxval=255, dtype=tf.int32
+    )
+
+    level = rng.uniform(shape=(), minval=1, maxval=7, dtype=tf.int32)
     replace = tf.constant([128] * 3)
+
+    transform = ShearY()
 
     @parameterized.named_parameters(NAMED_TEST_PARAMS)
     def test_batched_shear_y_producing_same_outputs_as_non_batched_in_for_loop(
         self, dtype: tf.dtypes.DType
     ):
-        inputs = tf.cast(MOCK_INPUT, dtype)
+        inputs = tf.cast(self.mock_input, dtype)
         non_batched_output = tf.stack(
             [
                 tfa.image.shear_y(x, level=self.level, replace=self.replace)
                 for x in inputs
             ]
         )
-        batched_output = shear_y(inputs, level=self.level, replace=self.replace)
+        batched_output = self.transform.shear_y(
+            inputs, level=self.level, replace=self.replace
+        )
 
         tf.debugging.assert_equal(batched_output, non_batched_output)
 
 
 class TestBatchedTranslateX(parameterized.TestCase):
+    rng = tf.random.Generator.from_non_deterministic_state()
+    mock_input = rng.uniform(
+        shape=(5, 224, 224, 3), minval=0, maxval=255, dtype=tf.int32
+    )
+
+    pixels = rng.uniform(shape=(), minval=1, maxval=7, dtype=tf.int32)
     replace = tf.constant([128] * 3)
-    pixels = tf.constant(20)  # Todo: random number
+
+    transform = TranslateX()
 
     @parameterized.named_parameters(NAMED_TEST_PARAMS)
     def test_batched_translate_x_works_the_same_as_non_batched_in_for_loop(
         self, dtype: tf.dtypes.DType
     ):
-        inputs = tf.cast(MOCK_INPUT, dtype)
+        inputs = tf.cast(self.mock_input, dtype)
 
         non_batched_output = tf.stack(
             [
@@ -125,20 +184,29 @@ class TestBatchedTranslateX(parameterized.TestCase):
             ]
         )
 
-        batched_output = translate_x(inputs, replace=self.replace, pixels=self.pixels)
+        batched_output = self.transform.translate_x(
+            inputs, replace=self.replace, pixels=self.pixels
+        )
 
         tf.debugging.assert_equal(batched_output, non_batched_output)
 
 
 class TestBatchedTranslateY(parameterized.TestCase):
+    rng = tf.random.Generator.from_non_deterministic_state()
+    mock_input = rng.uniform(
+        shape=(5, 224, 224, 3), minval=0, maxval=255, dtype=tf.int32
+    )
+
+    pixels = rng.uniform(shape=(), minval=1, maxval=7, dtype=tf.int32)
     replace = tf.constant([128] * 3)
-    pixels = tf.constant(20)  # Todo: random number
+
+    transform = TranslateY()
 
     @parameterized.named_parameters(NAMED_TEST_PARAMS)
-    def test_batched_translate_y_works_the_same_as_non_batched_in_for_loop(
+    def test_batched_translate_x_works_the_same_as_non_batched_in_for_loop(
         self, dtype: tf.dtypes.DType
     ):
-        inputs = tf.cast(MOCK_INPUT, dtype)
+        inputs = tf.cast(self.mock_input, dtype)
 
         non_batched_output = tf.stack(
             [
@@ -149,7 +217,9 @@ class TestBatchedTranslateY(parameterized.TestCase):
             ]
         )
 
-        batched_output = translate_y(inputs, replace=self.replace, pixels=self.pixels)
+        batched_output = self.transform.translate_y(
+            inputs, replace=self.replace, pixels=self.pixels
+        )
 
         tf.debugging.assert_equal(batched_output, non_batched_output)
 
