@@ -12,7 +12,11 @@ class BaseTransform(ABC):
     _MAX_LEVEL = tf.constant(10, dtype=tf.int32)
 
     def __init__(self, tf_function: bool = False):
-        self.__call__ = tf.function(self.__call__) if tf_function else self.__call__
+        self.__call__ = (
+            tf.function(func=self.__call__, experimental_compile=True)
+            if tf_function
+            else self.__call__
+        )
 
     @abstractmethod
     def __call__(self, images: tf.Tensor, level: tf.Tensor) -> tf.Tensor:

@@ -6,3 +6,6 @@ test:
 
 clean:
 	find . -name "*.py[co]" -o -name __pycache__ -exec rm -rf {} +
+
+benchmark:
+	python tf_autoaugment/benchmark/main_benchmark.py
