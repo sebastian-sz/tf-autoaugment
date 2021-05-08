@@ -31,9 +31,10 @@ class Sharpness(BaseTransform):
         kernel = tf.tile(kernel, [1, 1, image_channels, 1])
 
         # Apply kernel channel-wise.
-        degenerate = tf.nn.depthwise_conv2d(
-            images, kernel, strides=[1, 1, 1, 1], padding="VALID", dilations=[1, 1]
-        )
+        with tf.device("/CPU:0"):
+            degenerate = tf.nn.depthwise_conv2d(
+                images, kernel, strides=[1, 1, 1, 1], padding="VALID", dilations=[1, 1]
+            )
         degenerate = tf.cast(degenerate, image_dtype)
 
         # For the borders of the resulting image, fill in the values of the
