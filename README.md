@@ -1,2 +1,4 @@
 # tf-autoaugment
-Autoaugment transforms, using Tensorlfow ops.
+AutoAugment and RandAugment ops in TF 2.x
+
+This repository is a work in progress.
