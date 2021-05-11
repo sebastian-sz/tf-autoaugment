@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from absl.testing import absltest, parameterized
 
-from tf_autoaugment.randaugment import RandAugment
+from tf_autoaugment import RandAugment
 
 NAMED_TEST_PARAMS = [
     {"testcase_name": "use_tf_function", "tf_function": True},
