@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 from absl.testing import absltest, parameterized
 
-from tf_autoaugment.autoaugment import AutoAugment
+from tf_autoaugment import AutoAugment
 
 NAMED_TEST_PARAMS = [
     {"testcase_name": "use_tf_function", "tf_function": True},
